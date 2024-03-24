@@ -7,8 +7,10 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_python REQUIRED)
+
 find_package(rclcpp REQUIRED)
-find_package(rclcpp_action REQUIRED)
+find_package(rclpy REQUIRED)
 find_package(moveit_core REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(moveit_ros_planning REQUIRED)
@@ -22,6 +24,8 @@ find_package(xarm_planner REQUIRED)
 find_package(urdf REQUIRED)
 find_package(xacro REQUIRED)
 find_package(gazebo_ros REQUIRED)
+find_package(trajectory_msgs REQUIRED)
+
 
 
 if(BUILD_TESTING)
@@ -36,10 +40,19 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
+# Install Python modules
+ament_python_install_package(${PROJECT_NAME})
+# Install Python executables
+install(PROGRAMS
+  scripts/tennis_ball_position_publisher.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 install(
   DIRECTORY
     urdf
     launch
+    scripts
   DESTINATION
     share/${PROJECT_NAME}/
 )
