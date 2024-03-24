@@ -19,6 +19,10 @@ find_package(control_msgs REQUIRED)
 find_package(moveit_msgs REQUIRED)
 find_package(xarm_msgs REQUIRED)
 find_package(xarm_planner REQUIRED)
+find_package(urdf REQUIRED)
+find_package(xacro REQUIRED)
+find_package(gazebo_ros REQUIRED)
+
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -32,4 +36,11 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
+install(
+  DIRECTORY
+    urdf
+    launch
+  DESTINATION
+    share/${PROJECT_NAME}/
+)
 ament_package()

@@ -21,6 +21,7 @@
   <depend>moveit_msgs</depend>
   <depend>xarm_msgs</depend>
   <depend>xarm_planner</depend>
+  <depend>gazebo_ros</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
