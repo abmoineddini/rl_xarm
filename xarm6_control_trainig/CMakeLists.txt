@@ -44,7 +44,8 @@ endif()
 ament_python_install_package(${PROJECT_NAME})
 # Install Python executables
 install(PROGRAMS
-  scripts/tennis_ball_position_publisher.py
+  scripts/tennis_ball_position_publisher_joint_position.py
+  scripts/tennis_ball_position_publisher_joint_velocity.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

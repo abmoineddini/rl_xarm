@@ -22,9 +22,9 @@ class PositionPublisher(Node):
         dx = random.randint(-10,10) 
         dy = random.randint(-10,10) 
         dz = random.randint(-10,10) 
-        self.x = self.x+dx/500  
-        self.y = self.y+dy/500
-        self.z = self.z+dz/500
+        self.x = self.x+dx/300  
+        self.y = self.y+dy/300
+        self.z = self.z+dz/300
         msg.header.frame_id = 'world'
         msg.joint_names = ['x_joint', 'y_joint', 'z_joint']
         trajectory_point = JointTrajectoryPoint()

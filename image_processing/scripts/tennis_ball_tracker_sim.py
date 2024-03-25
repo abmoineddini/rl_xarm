@@ -41,15 +41,17 @@ class Camera(Node):
             cv2.rectangle(coins,(x, y), (x+w, y+h), (0, 255, 0), 1)
             # Fining center of the bounding box
             cv2.circle(coins, (int(x+w/2), int(y+h/2)), 1, (0,0,255), 1)
-            cv2.putText(coins, f"({w}, {h})", (x+h, y+h),cv2.FONT_HERSHEY_TRIPLEX, 2, (255,255,255), 2)
+            cv2.putText(coins, f"({w}, {h})", (x+h, y+h),cv2.FONT_HERSHEY_TRIPLEX, 0.5, (255,255,255), 1)
 
         try:
             cv2.putText(coins, f"Distance: {self.distance}", (int(x+w/2), 
                                                                         int(y+h/2)),
-                                                                        cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0,0), 2)
+                                                                        cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
             
         except:
             print("no distance value")
+
+        coins = cv2.resize(coins, (800, 600)) 
         cv2.imshow("tennis ball tracker", coins)
 
 
@@ -60,21 +62,23 @@ class Camera(Node):
     
     def callback_depth(self, data):
         depth_image = self.bridge.imgmsg_to_cv2(data)
-        depth_colourMap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.1), cv2.COLORMAP_HSV)
+        depth_colourMap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.1), cv2.COLORMAP_JET)
         try:
-            cv2.rectangle(depth_colourMap,(self.bounding_box[0], self.bounding_box[1]), 
-                          (self.bounding_box[0]+self.bounding_box[2], self.bounding_box[1]+self.bounding_box[3]), (0, 0, 0), 1)
+            # cv2.rectangle(depth_colourMap,(self.bounding_box[0], self.bounding_box[1]), 
+            #               (self.bounding_box[0]+self.bounding_box[2], self.bounding_box[1]+self.bounding_box[3]), (0, 0, 0), 1)
             self.distance = depth_image[int(self.bounding_box[1]+self.bounding_box[3]/2),
                                         int(self.bounding_box[0]+self.bounding_box[2]/2)]
             if self.distance> 0:
                 self.distance= self.distance+5
-            cv2.putText(depth_colourMap, f"Distance: {self.distance}", (int(self.bounding_box[0]+self.bounding_box[2]/2), 
+            cv2.putText(depth_colourMap, f"Distance: {self.distance}", (int(self.bounding_box[0]+self.bounding_box[2]/2-10), 
                                                                         int(self.bounding_box[1]+self.bounding_box[3]/2)),
                                                                         cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0,0), 2)
-            cv2.circle(depth_colourMap, (int(self.bounding_box[0]+self.bounding_box[2]/2),
+            cv2.circle(depth_colourMap, (int(self.bounding_box[0]+self.bounding_box[2]/2-12),
                                          int(self.bounding_box[1]+self.bounding_box[3]/2)), 2, (255,255,255), 2)
         except:
             print("Object not found")
+
+        depth_colourMap = cv2.resize(depth_colourMap, (800, 600)) 
         cv2.imshow("depth", depth_colourMap)
         # print(type(msg.data))
 
