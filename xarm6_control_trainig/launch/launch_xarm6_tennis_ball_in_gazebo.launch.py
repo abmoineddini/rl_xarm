@@ -3,6 +3,9 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch_ros.substitutions import FindPackageShare
+import time
 
 
 from launch_ros.actions import Node
@@ -11,10 +14,22 @@ import xacro
 
 def generate_launch_description():
 
+    add_realsense_d435i = LaunchConfiguration('add_realsense_d435i', default=True)
+    add_link_realsense_d435i = LaunchConfiguration('add_realsense_d435i', default=True)
+
+    Xarm6_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(PathJoinSubstitution([FindPackageShare('xarm_planner'), 'launch', 'xarm6_planner_gazebo.launch.py'])),
+        launch_arguments={
+            'add_realsense_d435i': add_realsense_d435i,
+            'add_d435i_links': add_link_realsense_d435i,
+        }.items(),
+    )
+
+
+    time.sleep(3)
     # Specify the name of the package and path to xacro file within the package
     pkg_name = 'xarm6_control_trainig'
-    # file_subpath = 'urdf/tennis_robot.urdf.xacro'
-    file_subpath = 'urdf/tennis_robot_cylindrical.urdf.xacro'
+    file_subpath = 'urdf/tennis_robot.urdf.xacro'
 
 
     # Use xacro to process the file
@@ -32,13 +47,6 @@ def generate_launch_description():
     )
 
 
-
-    # gazebo = IncludeLaunchDescription(
-    #     PythonLaunchDescriptionSource([os.path.join(
-    #         get_package_share_directory('gazebo_ros'), 'launch'), '/gazebo.launch.py']),
-    #     )
-
-
     spawn_entity = Node(package='gazebo_ros', executable='spawn_entity.py',
                     arguments=['-topic', 'robot_description',
                                 '-entity', 'tennis_ball'],
@@ -49,7 +57,7 @@ def generate_launch_description():
 
     # Run the node
     return LaunchDescription([
-        # gazebo,
+        Xarm6_launch,
         node_robot_state_publisher,
         spawn_entity
     ])
