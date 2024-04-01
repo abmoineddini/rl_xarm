@@ -47,6 +47,7 @@ install(PROGRAMS
   scripts/tennis_ball_position_publisher_joint_position.py
   scripts/tennis_ball_position_publisher_joint_velocity.py
   scripts/tennis_ball_position_publisher_joint_cylinder_velocity.py
+  scripts/reset_sim_tennis_ball.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
