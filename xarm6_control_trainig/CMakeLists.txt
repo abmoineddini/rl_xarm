@@ -50,6 +50,10 @@ install(PROGRAMS
   scripts/reset_sim_tennis_ball.py
   DESTINATION lib/${PROJECT_NAME}
 )
+add_library(xarm_planner STATIC IMPORTED)
+set_target_properties(xarm_planner PROPERTIES IMPORTED_LOCATION xarm_planner/include/xarm_planner/xarm_planner.h)
+
+
 
 install(
   DIRECTORY
