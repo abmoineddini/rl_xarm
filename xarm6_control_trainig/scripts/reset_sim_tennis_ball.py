@@ -2,7 +2,7 @@
 import sys
 from xarm_msgs.srv import PlanExec
 from xarm_msgs.srv import PlanJoint
-from std_msgs.msg import Empty
+from std_msgs.msg import Empty, Float32MultiArray
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 import rclpy
@@ -10,21 +10,21 @@ from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 
+import numpy as np
+
 
 class ResetSim(Node):
     def __init__(self):
         super().__init__('reset_sim_node')
 
-        topic_group = MutuallyExclusiveCallbackGroup()
-        plan_group = MutuallyExclusiveCallbackGroup()
-        excute_group = MutuallyExclusiveCallbackGroup()
-        self.subscription_colour_image = self.create_subscription(Empty, 'reset_sim', self.callback, 10, callback_group=topic_group)
+        self.subscription_colour_image = self.create_subscription(Empty, 'reset_sim', self.callback, 10) #, callback_group=topic_group)
+        self.publisher_joint_controller_ = self.create_publisher(Float32MultiArray, 'xarm_joint_controller', 10)
         
-        self.execute_joint_pos = self.create_client(PlanExec, '/xarm_exec_plan', callback_group= plan_group)
-        self.plan_joint_pos = self.create_client(PlanJoint, '/xarm_joint_plan', callback_group= excute_group)
 
-        self.req_plan = PlanJoint.Request()
-        self.req_excute = PlanExec.Request()
+
+        target_initial_pose = [-0.13962634008, -0.9599310880499999, -0.31415926518, 0.08726646254999999, 0.8028514554599999, -0.19198621760999998]
+        self.target_msg = Float32MultiArray()
+        self.target_msg.data = target_initial_pose
 
         # Reseting the ball Pose
         self.publisher_ = self.create_publisher(JointTrajectory, 'set_joint_trajectory', 10)        
@@ -37,27 +37,12 @@ class ResetSim(Node):
         self.msg.joint_names = ['theta_joint', 'r_joint', 'z_joint']
         self.msg.points.append(trajectory_point)
 
-    def send_execute_request(self):
-        self.req_excute.wait = True     
-        return self.execute_joint_pos.call(self.req_excute)
-    
-    def send_plan_request(self, ):
-        target_initial_pose = [-8.0, -55, -18.0, 5.0, 46.0, -11.0]
-        print([x * 0.01745329251 for x in target_initial_pose])
-        self.req_plan.target = [x * 0.01745329251 for x in target_initial_pose]
-        response = self.plan_joint_pos.call(self.req_plan)
-        if response.success==True:
-            response = self.send_execute_request()
-            print(response)
-        else:
-            print("planning failed")
-        return response
     
     def callback(self, Null_msg):
-            response = self.send_plan_request()
-            print(f"group response = {response.success}")
-            if response.success==True:
-                self.publisher_.publish(self.msg)
+            print("publish reset arm message")
+            self.publisher_joint_controller_.publish(self.target_msg)
+            print("publish reset ball position message")
+            self.publisher_.publish(self.msg)
         
 
         
@@ -67,15 +52,18 @@ class ResetSim(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = ResetSim()
-    executor = MultiThreadedExecutor()
-    executor.add_node(node)
-
-    try:
-        node.get_logger().info('Beginning client, shut down with CTRL-C')
-        executor.spin()
-    except KeyboardInterrupt:
-        node.get_logger().info('Keyboard interrupt, shutting down.\n')
+    # executor = MultiThreadedExecutor()
+    # executor.add_node(node)
+    rclpy.spin(node=node)
     node.destroy_node()
+    rclpy.shutdown()
+
+    # try:
+    #     node.get_logger().info('Beginning client, shut down with CTRL-C')
+    #     executor.spin()
+    # except KeyboardInterrupt:
+    #     node.get_logger().info('Keyboard interrupt, shutting down.\n')
+    # node.destroy_node()
 
 
 if __name__ == '__main__':
