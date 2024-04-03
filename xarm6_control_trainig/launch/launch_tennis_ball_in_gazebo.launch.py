@@ -31,7 +31,26 @@ def generate_launch_description():
         'use_sim_time': True}] # add other parameters here if required
     )
 
+    xarm_joint_controller = Node(
+        package=pkg_name,
+        executable='xarm_joint_controller.py',
+        output='screen',
+        parameters=[{'use_sim_time': True}] # add other parameters here if required
+    )
 
+    reset_xarm_joint = Node(
+        package=pkg_name,
+        executable='reset_sim_tennis_ball.py',
+        output='screen',
+        parameters=[{'use_sim_time': True}] # add other parameters here if required
+    )
+
+    image_processing = Node(
+        package='image_processing',
+        executable='tennis_ball_tracker_sim_publisher.py',
+        output='screen',
+        parameters=[{'use_sim_time': True}] # add other parameters here if required
+    )
 
     # gazebo = IncludeLaunchDescription(
     #     PythonLaunchDescriptionSource([os.path.join(
@@ -51,5 +70,8 @@ def generate_launch_description():
     return LaunchDescription([
         # gazebo,
         node_robot_state_publisher,
+        xarm_joint_controller,
+        reset_xarm_joint,
+        image_processing,
         spawn_entity
     ])

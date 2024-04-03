@@ -46,6 +46,7 @@ install(PROGRAMS
   scripts/tennis_ball_colour_calib_sim.py
   scripts/tennis_ball_depth_calib_sim.py
   scripts/tennis_ball_tracker_sim.py
+  scripts/tennis_ball_tracker_sim_publisher.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
