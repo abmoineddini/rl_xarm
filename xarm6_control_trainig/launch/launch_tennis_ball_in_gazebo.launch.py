@@ -24,6 +24,7 @@ def generate_launch_description():
 
     # Configure the node
     node_robot_state_publisher = Node(
+        name='robot_state_publisher1',
         package='robot_state_publisher',
         executable='robot_state_publisher',
         output='screen',

@@ -54,6 +54,24 @@ install(PROGRAMS
 add_library(xarm_planner STATIC IMPORTED)
 set_target_properties(xarm_planner PROPERTIES IMPORTED_LOCATION xarm_planner/include/xarm_planner/xarm_planner.h)
 
+add_executable(controller_moveit src/controller_moveit.cpp)
+target_include_directories(controller_moveit PUBLIC include)
+ament_target_dependencies(controller_moveit
+  ament_cmake
+	rclcpp
+	rclcpp_action
+	moveit_core
+	moveit_ros_planning_interface
+	interactive_markers
+	moveit_ros_planning
+	control_msgs)
+
+# Install the executable
+install(TARGETS 
+    controller_moveit
+    DESTINATION lib/${PROJECT_NAME}
+)
+
 
 
 install(
