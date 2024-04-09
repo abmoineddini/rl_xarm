@@ -1,59 +1,93 @@
-#include <moveit/move_group_interface/move_group_interface.h>
-#include <moveit/planning_scene_interface/planning_scene_interface.h>
+#include <chrono>
+#include <memory>
+#include "rclcpp/rclcpp.hpp"
+#include "std_msgs/msg/float64_multi_array.hpp"
+#include "xarm_msgs/srv/plan_exec.hpp"
+#include "xarm_msgs/srv/plan_joint.hpp"
 
-#include <moveit_msgs/msg/display_robot_state.hpp>
-#include <moveit_msgs/msg/display_trajectory.hpp>
 
-static const rclcpp::Logger LOGGER = rclcpp::get_logger("move_group_demo");
-static const std::string PLANNING_GROUP = "xarm6";
+using namespace std::chrono_literals;
 
-int main(int argc, char **argv) {
-  rclcpp::init(argc, argv);
-  rclcpp::NodeOptions node_options;
-  node_options.automatically_declare_parameters_from_overrides(true);
-  auto move_group_node =
-      rclcpp::Node::make_shared("move_group_interface_tutorial", node_options);
+using namespace std;
 
-  rclcpp::executors::SingleThreadedExecutor executor;
-  executor.add_node(move_group_node);
-  std::thread([&executor]() { executor.spin(); }).detach();
+class xarm_controller : public rclcpp::Node
+{
+public:
+    xarm_controller() : Node("xarm_joint_controller_node")
+    {
+        callback_exec_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+        callback_plan_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+        callback_subscriber_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
-  moveit::planning_interface::MoveGroupInterface move_group(move_group_node,
-                                                            PLANNING_GROUP);
 
-  const moveit::core::JointModelGroup *joint_model_group =
-      move_group.getCurrentState()->getJointModelGroup(PLANNING_GROUP);
+        client_ptr_exec_ = this->create_client<xarm_msgs::srv::PlanExec>("xarm_exec_plan", rmw_qos_profile_services_default,
+                                                                callback_exec_group_);
 
-  RCLCPP_INFO(LOGGER, "Planning frame: %s",
-              move_group.getPlanningFrame().c_str());
+        client_ptr_plan_ = this->create_client<xarm_msgs::srv::PlanJoint>("xarm_joint_plan", rmw_qos_profile_services_default,
+                                                                callback_exec_group_);
 
-  RCLCPP_INFO(LOGGER, "End effector link: %s",
-              move_group.getEndEffectorLink().c_str());
+        rclcpp::SubscriptionOptions options;
+        options.callback_group = callback_subscriber_group_;
 
-  RCLCPP_INFO(LOGGER, "Available Planning Groups:");
-  std::copy(move_group.getJointModelGroupNames().begin(),
-            move_group.getJointModelGroupNames().end(),
-            std::ostream_iterator<std::string>(std::cout, ", "));
+        subscriber_ = this->create_subscription<std_msgs::msg::Float64MultiArray>("xarm_joint_controller", 10, std::bind(&xarm_controller::callback, 
+                                                                                    this, std::placeholders::_1));
+    }
 
-  moveit::core::RobotStatePtr current_state = move_group.getCurrentState(10);
+private:
+    rclcpp::CallbackGroup::SharedPtr callback_exec_group_;
+    rclcpp::CallbackGroup::SharedPtr callback_plan_group_;
+    rclcpp::CallbackGroup::SharedPtr callback_subscriber_group_;
+    rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr subscriber_;
+    rclcpp::Client<xarm_msgs::srv::PlanExec>::SharedPtr client_ptr_exec_;
+    rclcpp::Client<xarm_msgs::srv::PlanJoint>::SharedPtr client_ptr_plan_;
+    rclcpp::TimerBase::SharedPtr timer_ptr_;
 
-  std::vector<double> joint_group_positions;
-  current_state->copyJointGroupPositions(joint_model_group,
-                                         joint_group_positions);
+    void callback(const std_msgs::msg::Float64MultiArray::SharedPtr msg)
+    {
+        RCLCPP_INFO(this->get_logger(), "Sending request");
+        auto request_plan = std::make_shared<xarm_msgs::srv::PlanJoint::Request>();
+        request_plan-> target = msg->data;
+        auto result_future_plan = client_ptr_plan_->async_send_request(request_plan);
 
-  // joint_group_positions[0] = 0.00;  // Shoulder Pan
-  joint_group_positions[1] = -1.50; // Shoulder Lift
-  joint_group_positions[2] = -1.50;  // Elbow
-  joint_group_positions[3] = 0.0; // Wrist 1
-  joint_group_positions[4] = -1.55; // Wrist 2
-  // joint_group_positions[5] = 0.00;  // Wrist 3
-  move_group.setJointValueTarget(joint_group_positions);
+        // if (rclcpp::spin_until_future_complete(client_ptr_plan_, result_future_plan) == rclcpp::FutureReturnCode::SUCCESS){
+        //     RCLCPP_INFO(this->get_logger(), "Received plan response");
+        //     auto request_exec = std::make_shared<xarm_msgs::srv::PlanExec::Request>();
+        //     request_exec->wait = true;
+        //     auto result_future_exec = client_ptr_exec_->async_send_request(request_exec);
+        //     if (rclcpp::spin_until_future_complete(client_ptr_exec_, result_future_exec) == rclcpp::FutureReturnCode::SUCCESS){
+        //         RCLCPP_INFO(this->get_logger(), "Received exec response");
+        //     }
+        // }
+        auto result = result_future_plan.get();
+        if (result->success == true) {
+            RCLCPP_INFO(this->get_logger(), "Received plan response");
+            auto request_exec = std::make_shared<xarm_msgs::srv::PlanExec::Request>();
+            request_exec->wait = true;
+            auto result_future_exec = client_ptr_exec_->async_send_request(request_exec);
+            auto result = result_future_exec.get();
+            if (result->success == true) {
+                RCLCPP_INFO(this->get_logger(), "Received exec response");
+            }
+        }
 
-  moveit::planning_interface::MoveGroupInterface::Plan my_plan;
 
-  bool success =
-      (move_group.plan(my_plan) == moveit::core::MoveItErrorCode::SUCCESS);
+    }
+    
+};  // class DemoNode
 
-  rclcpp::shutdown();
-  return 0;
+
+int main(int argc, char* argv[])
+{
+    rclcpp::init(argc, argv);
+    std::shared_ptr<xarm_controller> xarm_conttoller_node =
+      std::make_shared<xarm_controller>();
+    rclcpp::executors::MultiThreadedExecutor executor;
+    executor.add_node(xarm_conttoller_node);
+
+    RCLCPP_INFO(xarm_conttoller_node->get_logger(), "Starting client node, shut down with CTRL-C");
+    executor.spin();
+    RCLCPP_INFO(xarm_conttoller_node->get_logger(), "Keyboard interrupt, shutting down.\n");
+
+    rclcpp::shutdown();
+    return 0;
 }

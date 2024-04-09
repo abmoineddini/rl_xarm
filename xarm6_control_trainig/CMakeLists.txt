@@ -64,7 +64,9 @@ ament_target_dependencies(controller_moveit
 	moveit_ros_planning_interface
 	interactive_markers
 	moveit_ros_planning
-	control_msgs)
+	control_msgs
+  xarm_msgs
+  xarm_planner)
 
 # Install the executable
 install(TARGETS 
