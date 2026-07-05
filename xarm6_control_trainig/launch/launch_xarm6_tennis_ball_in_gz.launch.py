@@ -54,7 +54,10 @@ from launch.event_handlers import OnProcessExit
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
+import yaml
+
 from uf_ros_lib.uf_robot_utils import get_xacro_content, generate_ros2_control_params_temp_file
+from uf_ros_lib.moveit_configs_builder import MoveItConfigsBuilder
 
 
 def launch_setup(context, *args, **kwargs):
@@ -62,6 +65,8 @@ def launch_setup(context, *args, **kwargs):
     pkg_share = get_package_share_directory(pkg_name)
 
     enable_arm_command_helpers = LaunchConfiguration('enable_arm_command_helpers')
+    use_moveit = LaunchConfiguration('use_moveit')
+    use_moveit_rviz = LaunchConfiguration('use_moveit_rviz')
 
     # ---- xarm6 identity (fixed for this task) ----
     dof = '6'
@@ -77,6 +82,9 @@ def launch_setup(context, *args, **kwargs):
     tennis_ball_gz = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_share, 'launch', 'launch_tennis_ball_in_gz.launch.py')),
+        launch_arguments={
+            'show_frame': LaunchConfiguration('show_frame'),
+        }.items(),
     )
 
     # ------------------------------------------------------------------
@@ -108,6 +116,26 @@ def launch_setup(context, *args, **kwargs):
         ros2_control_plugin=ros2_control_plugin,
         ros2_control_params=ros2_control_params,
     )
+
+    # ---- MoveIt config for move_group + xarm_planner_node (the services) ----
+    # Built from the SAME xacro args as the spawned arm, so the planner reasons
+    # about the same model that is in the sim. controllers_name='controllers'
+    # maps move_group execution onto the xarm6_traj_controller
+    # FollowJointTrajectory action that ign_ros2_control exposes.
+    moveit_config = MoveItConfigsBuilder(
+        context=context,
+        controllers_name='controllers',
+        dof=dof,
+        robot_type=robot_type,
+        prefix=prefix,
+        hw_ns=hw_ns,
+        limited=True,
+        add_realsense_d435i=True,
+        add_d435i_links=True,
+        ros2_control_plugin=ros2_control_plugin,
+        ros2_control_params=ros2_control_params,
+    ).to_moveit_configs()
+    moveit_config_dump = yaml.dump(moveit_config.to_dict())
 
     # xarm6 robot_state_publisher. This deliberately uses the DEFAULT node name
     # 'robot_state_publisher' and publishes on '/robot_description', because the
@@ -235,14 +263,61 @@ def launch_setup(context, *args, **kwargs):
         condition=IfCondition(enable_arm_command_helpers),
     )
 
+    # ------------------------------------------------------------------
+    # 6. MoveIt: move_group + xarm_planner_node (serves /xarm_joint_plan and
+    #    /xarm_exec_plan, the same services xarm_joint_controller.py uses on the
+    #    real hardware) + a world->link_base static TF.
+    #
+    #    move_group is started with no_gui_ctrl:=false ON PURPOSE: common2's
+    #    built-in planner include does NOT forward dof, so it launches
+    #    xarm_planner_node with the default dof=7 -> planning group 'xarm7' ->
+    #    crash on an xarm6. We instead start _robot_planner.launch.py ourselves
+    #    below with dof=6 and use_sim_time:=true (the latter is required or
+    #    MoveGroupInterface::getCurrentState() hangs against sim time).
+    # ------------------------------------------------------------------
+    move_group_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(PathJoinSubstitution(
+            [FindPackageShare('xarm_moveit_config'), 'launch', '_robot_moveit_common2.launch.py'])),
+        condition=IfCondition(use_moveit),
+        launch_arguments={
+            'prefix': prefix,
+            'attach_to': 'world',
+            'attach_xyz': '"0 0 0"',
+            'attach_rpy': '"0 0 0"',
+            'show_rviz': use_moveit_rviz,
+            'no_gui_ctrl': 'false',
+            'use_sim_time': 'true',
+            'moveit_config_dump': moveit_config_dump,
+        }.items(),
+    )
+
+    planner_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(PathJoinSubstitution(
+            [FindPackageShare('xarm_planner'), 'launch', '_robot_planner.launch.py'])),
+        condition=IfCondition(use_moveit),
+        launch_arguments={
+            'dof': dof,
+            'robot_type': robot_type,
+            'prefix': prefix,
+            'moveit_config_dump': moveit_config_dump,
+            'node_parameters': '{"use_sim_time": true}',
+        }.items(),
+    )
+
     # Give the tennis include time to bring the gz server up before spawning
     # the arm into it (mirrors the 5 s delay the Classic top-level used).
     delayed_arm = TimerAction(
         period=5.0,
         actions=[pedestal_spawn, xarm_spawn, camera_bridge],
     )
+    # move_group after the arm + controllers exist so it connects to the
+    # trajectory action promptly (it would otherwise retry with warnings).
+    delayed_moveit = TimerAction(
+        period=10.0,
+        actions=[move_group_launch, planner_launch],
+    )
     delayed_helpers = TimerAction(
-        period=8.0,
+        period=12.0,
         actions=[image_tracker, xarm_joint_controller, reset_sim],
     )
 
@@ -251,6 +326,7 @@ def launch_setup(context, *args, **kwargs):
         xarm_rsp,
         delayed_arm,
         load_controllers_after_spawn,
+        delayed_moveit,
         delayed_helpers,
     ]
 
@@ -258,12 +334,33 @@ def launch_setup(context, *args, **kwargs):
 def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument(
+            'show_frame',
+            default_value='false',
+            description='Render the black tennis-ball gantry frame (true) or '
+                        'show only the ball (false). Physics is unchanged.',
+        ),
+        DeclareLaunchArgument(
+            'use_moveit',
+            default_value='true',
+            description='Start MoveIt move_group + xarm_planner_node so the '
+                        '/xarm_joint_plan and /xarm_exec_plan services exist in '
+                        'sim, exactly as on the real hardware. Set false for an '
+                        'arm + controllers only setup (command '
+                        '/xarm6_traj_controller directly).',
+        ),
+        DeclareLaunchArgument(
+            'use_moveit_rviz',
+            default_value='false',
+            description='Show the MoveIt RViz view (only used when use_moveit '
+                        'is true).',
+        ),
+        DeclareLaunchArgument(
             'enable_arm_command_helpers',
             default_value='true',
             description='Run xarm_joint_controller.py / reset_sim_tennis_ball.py. '
-                        'These need the xarm planner services (/xarm_joint_plan, '
-                        '/xarm_exec_plan) from the MoveIt stack, which is NOT '
-                        'launched here. Set false to omit them.',
+                        'These drive the arm through the /xarm_joint_plan and '
+                        '/xarm_exec_plan services, so keep use_moveit:=true for '
+                        'them to work. Set false to omit them.',
         ),
         OpaqueFunction(function=launch_setup),
     ])

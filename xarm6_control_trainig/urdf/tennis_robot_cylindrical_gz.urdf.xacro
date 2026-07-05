@@ -20,6 +20,13 @@
 -->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="tennis_ball">
 
+  <!-- show_frame: when true, the black gantry frame (base/theta/r/z links) is
+       rendered; when false (default) only the ball is visible. Collision and
+       inertia are always present regardless, so physics is unchanged.
+       Driven by the 'show_frame' launch argument. -->
+  <xacro:arg name="show_frame" default="false"/>
+  <xacro:property name="show_frame" value="$(arg show_frame)"/>
+
   <!-- Material Definition (URDF-side, used by robot_state_publisher / RViz) -->
   <material name="yellow">
     <color rgba="1 1 0 1"/>
@@ -34,7 +41,14 @@
 
   <link name="base_link">
     <origin xyz="0 0 0" rpy="0 0 0"/>
-    <!-- gantry frame visual hidden (physics kept via collision below) -->
+    <xacro:if value="${show_frame}">
+      <visual>
+        <geometry>
+          <box size="1.2 0.01 0.01"/>
+        </geometry>
+        <material name="black"/>
+      </visual>
+    </xacro:if>
     <collision>
       <geometry>
         <box size="1.2 0.01 0.01"/>
@@ -50,7 +64,15 @@
 
   <!-- The cylindrical robot -->
   <link name="theta_link">
-    <!-- gantry frame visual hidden (physics kept via collision below) -->
+    <xacro:if value="${show_frame}">
+      <visual>
+        <origin xyz="0 0.380 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="0.01 0.75 0.01"/>
+        </geometry>
+        <material name="black"/>
+      </visual>
+    </xacro:if>
 
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -69,7 +91,15 @@
 
 
   <link name="r_link">
-    <!-- gantry frame visual hidden (physics kept via collision below) -->
+    <xacro:if value="${show_frame}">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="0.01 0.01 2.0"/>
+        </geometry>
+        <material name="black"/>
+      </visual>
+    </xacro:if>
 
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -88,7 +118,15 @@
 
 
   <link name="z_link">
-    <!-- gantry frame visual hidden (physics kept via collision below) -->
+    <xacro:if value="${show_frame}">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="0.01 0.01 0.01"/>
+        </geometry>
+        <material name="black"/>
+      </visual>
+    </xacro:if>
 
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>

@@ -5,13 +5,16 @@
 # gz JointTrajectoryController (or the Classic joint_pose_trajectory plugin)
 # consumes.
 #
-# Each joint does a bounded random walk: it integrates a random velocity and
-# bounces off its joint limit, so the ball keeps moving and never leaves the
-# reachable range. Velocities are re-randomised once per second.
+# Motion model: each joint INDEPENDENTLY seeks a random target drawn uniformly
+# from its full range. When it reaches the target it picks a new one (at a new
+# random speed). Because targets are uniform over the whole range and the three
+# joints are unsynchronised, the ball roams the entire reachable volume instead
+# of piling up at the limits.
 #
-# NOTE (previous bug): the old version did `pos = sin(pos + v*dt)`. Iterating
-# sin is a contraction, so all positions decayed to ~0 and the ball drifted to
-# the centre and stopped. It also ignored the joint limits below.
+# History: the very first version did `pos = sin(pos + v*dt)` (decays to 0, ball
+# stops). The second used a reflecting velocity random walk, which tended to
+# accumulate at the joint limits (ball stuck far left/right). This target-
+# seeking version spreads the motion out much more evenly.
 import random
 
 import rclpy
@@ -35,31 +38,33 @@ class PositionPublisher(Node):
         self.publisher_ = self.create_publisher(JointTrajectory, 'set_joint_trajectory', 10)
 
         self.dt = 0.0332  # ~30 Hz command rate
-        # start each joint at the middle of its range
-        self.pos = {j: 0.5 * (lo + hi) for j, (lo, hi) in JOINT_LIMITS.items()}
-        self.vel = {j: 0.0 for j in JOINTS}
-        self._randomize_velocity()
+        # start each joint at a random spot in its range
+        self.pos = {j: random.uniform(lo, hi) for j, (lo, hi) in JOINT_LIMITS.items()}
+        self.target = {}
+        self.speed = {}
+        for j in JOINTS:
+            self._new_target(j)
 
         self.create_timer(self.dt, self.timer_callback)
-        self.create_timer(1.0, self._randomize_velocity)  # new random speeds each second
 
-    def _randomize_velocity(self):
-        # Random signed speed per joint, scaled to each joint's span so every
-        # joint moves visibly regardless of how tight its limits are.
-        for j, (lo, hi) in JOINT_LIMITS.items():
-            span = hi - lo
-            speed = random.uniform(0.2, 1.0) * span  # units/sec (rad for theta, m for r/z)
-            self.vel[j] = speed * random.choice((-1.0, 1.0))
+    def _new_target(self, joint):
+        lo, hi = JOINT_LIMITS[joint]
+        span = hi - lo
+        # Uniform target over the FULL range -> even coverage of the space.
+        self.target[joint] = random.uniform(lo, hi)
+        # Random traverse speed each leg, so the pace varies too.
+        self.speed[joint] = random.uniform(0.3, 1.0) * span  # units/sec
 
     def timer_callback(self):
-        for j, (lo, hi) in JOINT_LIMITS.items():
-            p = self.pos[j] + self.vel[j] * self.dt
-            # Bounce off the limits so motion stays in range and keeps going.
-            if p < lo:
-                p, self.vel[j] = lo, abs(self.vel[j])
-            elif p > hi:
-                p, self.vel[j] = hi, -abs(self.vel[j])
-            self.pos[j] = p
+        for joint in JOINTS:
+            step = self.speed[joint] * self.dt
+            error = self.target[joint] - self.pos[joint]
+            if abs(error) <= step:
+                # reached (or overshoot this tick) -> snap and pick a new target
+                self.pos[joint] = self.target[joint]
+                self._new_target(joint)
+            else:
+                self.pos[joint] += step if error > 0 else -step
 
         point = JointTrajectoryPoint()
         point.positions = [self.pos[j] for j in JOINTS]

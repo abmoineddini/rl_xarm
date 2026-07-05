@@ -22,8 +22,12 @@
 
 # --- Joint states OUT of sim ---
 # JointStatePublisher system publishes an ignition.msgs.Model on this gz topic;
-# the bridge converts it to sensor_msgs/JointState on ROS /joint_states.
-- ros_topic_name: "/joint_states"
+# the bridge converts it to sensor_msgs/JointState.
+# NOTE: published on /tennis_ball/joint_states (NOT the shared /joint_states) so
+# the gantry joints (theta/r/z) don't pollute the arm's /joint_states, which
+# move_group reads (it would log "Joint 'theta_joint' not found in model
+# 'UF_ROBOT'"). The gantry's own robot_state_publisher subscribes here.
+- ros_topic_name: "/tennis_ball/joint_states"
   gz_topic_name: "/world/tennis_world/model/tennis_ball/joint_state"
   ros_type_name: "sensor_msgs/msg/JointState"
   gz_type_name: "ignition.msgs.Model"
