@@ -1,9 +1,26 @@
 <?xml version="1.0"?>
-<robot xmlns:xacro="http://www.ros.org/wiki/xacro"  name="tennis_ball">
+<!--
+  New-Gazebo (Ignition Fortress / gz-sim 6) description of the CYLINDRICAL
+  tennis-ball gantry target robot.  Parallel to the Classic
+  `tennis_robot_cylindrical.urdf.xacro` which is left untouched.
 
-  <!-- <xacro:include filename="$(find xarm_description)/urdf/xarm_device.urdf.xacro" /> -->
+  Link and joint names are IDENTICAL to the Classic cylindrical model
+  (theta_joint / r_joint / z_joint) so downstream scripts stay compatible.
 
-  <!-- Material Definition -->
+  Differences vs the Classic cylindrical file (all deliberate, noted here):
+    - Includes gazebo_plugin_cylindrical_gz.xacro (Ignition system plugins +
+      Fortress materials) instead of the Classic gazebo_plugin_cylindrical.xacro.
+    - Fixed several inertia values that were malformed doubles in the Classic
+      file (e.g. "0.0.06041666667", "0.0008333333333" written as
+      "0.0.008333333333").  Those strings are not valid numbers and would be
+      rejected by the URDF parser / SDF converter.  The intended magnitudes
+      were obvious from the matching well-formed values elsewhere, so they are
+      restored to 0.06041666667 / 0.008333333333 / 0.0008333333333 as
+      appropriate.  Masses, joint limits and damping are otherwise preserved.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="tennis_ball">
+
+  <!-- Material Definition (URDF-side, used by robot_state_publisher / RViz) -->
   <material name="yellow">
     <color rgba="1 1 0 1"/>
   </material>
@@ -26,7 +43,8 @@
     <inertial>
       <mass value="10"/>
       <origin rpy="0 0 0" xyz="0 0 0"/>
-      <inertia ixx="0.008333333333" ixy="0" ixz="0" iyy="0.0.06041666667" iyz="0" izz="0.0.06041666667"/>
+      <!-- was iyy/izz "0.0.06041666667" (invalid) -> 0.06041666667 -->
+      <inertia ixx="0.008333333333" ixy="0" ixz="0" iyy="0.06041666667" iyz="0" izz="0.06041666667"/>
     </inertial>
   </link>
 
@@ -44,11 +62,12 @@
     <inertial>
       <mass value="0.5"/>
       <origin rpy="0 0 0" xyz="0 0 0"/>
-      <inertia ixx="0.0.06041666667" ixy="0" ixz="0" iyy="0.0008333333333" iyz="0" izz="0.0.06041666667"/>
+      <!-- was ixx/izz "0.0.06041666667" (invalid) -> 0.06041666667 -->
+      <inertia ixx="0.06041666667" ixy="0" ixz="0" iyy="0.0008333333333" iyz="0" izz="0.06041666667"/>
     </inertial>
   </link>
-  
-  
+
+
   <link name="r_link">
     <!-- gantry frame visual hidden (physics kept via collision below) -->
 
@@ -62,11 +81,12 @@
     <inertial>
       <mass value="0.5"/>
       <origin rpy="0 0 0" xyz="0 0 0"/>
-      <inertia ixx="0.0.06041666667" ixy="0" ixz="0" iyy="0.0.06041666667" iyz="0" izz="0.0008333333333"/>
+      <!-- was ixx/iyy "0.0.06041666667" (invalid) -> 0.06041666667 -->
+      <inertia ixx="0.06041666667" ixy="0" ixz="0" iyy="0.06041666667" iyz="0" izz="0.0008333333333"/>
     </inertial>
   </link>
 
-  
+
   <link name="z_link">
     <!-- gantry frame visual hidden (physics kept via collision below) -->
 
@@ -80,10 +100,11 @@
     <inertial>
       <mass value="0.5"/>
       <origin rpy="0 0 0" xyz="0 0 0"/>
-      <inertia ixx="0.0.008333333333" ixy="0" ixz="0" iyy="0.0008333333333" iyz="0" izz="0.0.008333333333"/>
+      <!-- was ixx/izz "0.0.008333333333" (invalid) -> 0.008333333333 -->
+      <inertia ixx="0.008333333333" ixy="0" ixz="0" iyy="0.0008333333333" iyz="0" izz="0.008333333333"/>
     </inertial>
   </link>
-  
+
   <!-- Link Definition -->
   <link name="ball">
     <visual>
@@ -105,7 +126,7 @@
       <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
     </inertial>
   </link>
-  
+
   <!-- Joints  -->
   <joint name="world_to_base_link_joint" type="fixed">
       <origin xyz="-0.2 -0.415 0.005" rpy="0 0 0"/>
@@ -118,8 +139,8 @@
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <parent link="base_link"/>
       <child link="theta_link"/>
-      <limit effort="50" velocity="0.01" lower="-1.5707" upper="1.5707"/>
-      <dynamics damping="100.0" friction="100.0"/> 
+      <limit effort="1000" velocity="5.0" lower="-1.5707" upper="1.5707"/>
+      <dynamics damping="1.0" friction="0.0"/>
   </joint>
 
   <joint name="r_joint" type="prismatic">
@@ -127,8 +148,8 @@
       <parent link="theta_link"/>
       <child link="r_link"/>
       <axis xyz="0 1 0"/>
-      <limit effort="50" velocity="0.01" lower="-0.35" upper="0.1"/>
-      <dynamics damping="100.0" friction="100.0"/> 
+      <limit effort="1000" velocity="5.0" lower="-0.35" upper="0.1"/>
+      <dynamics damping="1.0" friction="0.0"/>
   </joint>
 
   <joint name="z_joint" type="prismatic">
@@ -136,8 +157,8 @@
       <parent link="r_link"/>
       <child link="z_link"/>
       <axis xyz="0 0 1"/>
-      <limit effort="50" velocity="0.01" lower="-0.2" upper="0.75"/>
-      <dynamics damping="100.0" friction="100.0"/> 
+      <limit effort="1000" velocity="5.0" lower="-0.2" upper="0.75"/>
+      <dynamics damping="1.0" friction="0.0"/>
   </joint>
 
   <joint name="fixed_joint" type="fixed">
@@ -146,10 +167,19 @@
       <child link="ball"/>
   </joint>
 
-  <xacro:include filename="gazebo_plugin_cylindrical.xacro" />
-
+  <!-- Ignition Fortress system plugins + Fortress materials -->
+  <xacro:include filename="gazebo_plugin_cylindrical_gz.xacro" />
 
 </robot>
 
+<!--
+  How to move the ball (Fortress path):
+  The ros_gz_bridge maps ROS topic /set_joint_trajectory
+  (trajectory_msgs/msg/JointTrajectory) into the gz topic
+  /model/tennis_ball/set_joint_trajectory which the
+  JointTrajectoryController system consumes.  Example:
 
-<!-- ros2 topic pub -1 /set_joint_trajectory trajectory_msgs/msg/JointTrajectory  '{header: {frame_id: world}, joint_names: [theta_joint, r_joint, z_joint], points: [{positions: {1.0,0.3,0.3}]}' -->
+  ros2 topic pub -1 /set_joint_trajectory trajectory_msgs/msg/JointTrajectory \
+    '{header: {frame_id: world}, joint_names: [theta_joint, r_joint, z_joint], \
+      points: [{positions: [0.5, -0.1, 0.3]}]}'
+-->

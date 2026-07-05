@@ -81,6 +81,8 @@ install(
     urdf
     launch
     scripts
+    config
+    worlds
   DESTINATION
     share/${PROJECT_NAME}/
 )

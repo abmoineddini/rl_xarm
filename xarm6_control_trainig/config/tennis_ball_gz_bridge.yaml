@@ -1,0 +1,41 @@
+# ros_gz_bridge (parameter_bridge) config for the Fortress tennis-ball gantry.
+#
+# Used by ros_gz_bridge parameter_bridge via the `config_file` parameter.
+# Each entry maps one ROS topic <-> one gz (Ignition Transport) topic.
+#
+# direction:
+#   GZ_TO_ROS      -> gz publishes, ROS subscribes
+#   ROS_TO_GZ      -> ROS publishes, gz subscribes
+#   BIDIRECTIONAL  -> both
+#
+# NOTE on gz topic names below: they must match the <topic> overrides set in
+# urdf/gazebo_plugin_cylindrical_gz.xacro and the world name used at launch
+# (tennis_world). If you change the world name or the plugin <topic> values,
+# update these accordingly.
+
+# --- Simulation clock (needed for use_sim_time across all ROS nodes) ---
+- ros_topic_name: "/clock"
+  gz_topic_name: "/clock"
+  ros_type_name: "rosgraph_msgs/msg/Clock"
+  gz_type_name: "ignition.msgs.Clock"
+  direction: GZ_TO_ROS
+
+# --- Joint states OUT of sim ---
+# JointStatePublisher system publishes an ignition.msgs.Model on this gz topic;
+# the bridge converts it to sensor_msgs/JointState on ROS /joint_states.
+- ros_topic_name: "/joint_states"
+  gz_topic_name: "/world/tennis_world/model/tennis_ball/joint_state"
+  ros_type_name: "sensor_msgs/msg/JointState"
+  gz_type_name: "ignition.msgs.Model"
+  direction: GZ_TO_ROS
+
+# --- Ball command trajectory INTO sim ---
+# This is the replacement command path for the Classic joint_pose_trajectory
+# plugin. Downstream scripts publish trajectory_msgs/JointTrajectory on ROS
+# /set_joint_trajectory; the bridge forwards it to the gz topic consumed by
+# the JointTrajectoryController system, which drives theta_joint/r_joint/z_joint.
+- ros_topic_name: "/set_joint_trajectory"
+  gz_topic_name: "/model/tennis_ball/set_joint_trajectory"
+  ros_type_name: "trajectory_msgs/msg/JointTrajectory"
+  gz_type_name: "ignition.msgs.JointTrajectory"
+  direction: ROS_TO_GZ

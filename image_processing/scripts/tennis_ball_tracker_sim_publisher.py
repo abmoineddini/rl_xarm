@@ -3,9 +3,33 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
 from std_msgs.msg import Float64MultiArray
-from cv_bridge import CvBridge 
-import cv2 
+import cv2
 import numpy as np
+
+
+# Minimal sensor_msgs/Image -> numpy conversion, replacing cv_bridge.
+# cv_bridge's C extension (cv_bridge_boost) is built against NumPy 1.x and
+# fails to import under NumPy 2 ("_ARRAY_API not found"). This project's
+# NumPy is 2.x (required by curobo/gymnasium/etc.), so we avoid cv_bridge
+# entirely and unpack the image buffer ourselves.
+_ENCODING_TO_DTYPE = {
+    'rgb8': (np.uint8, 3), 'bgr8': (np.uint8, 3),
+    'rgba8': (np.uint8, 4), 'bgra8': (np.uint8, 4),
+    'mono8': (np.uint8, 1), '8uc1': (np.uint8, 1), '8uc3': (np.uint8, 3),
+    'mono16': (np.uint16, 1), '16uc1': (np.uint16, 1),
+    '32fc1': (np.float32, 1),
+}
+
+
+def imgmsg_to_cv2(msg):
+    dtype, channels = _ENCODING_TO_DTYPE.get(msg.encoding.lower(), (np.uint8, 3))
+    dt = np.dtype(dtype).newbyteorder('>' if msg.is_bigendian else '<')
+    buf = np.frombuffer(msg.data, dtype=dt)
+    # Honour row stride (step) in case rows are padded.
+    arr = buf.reshape(msg.height, msg.step // dt.itemsize)[:, :msg.width * channels]
+    if channels > 1:
+        arr = arr.reshape(msg.height, msg.width, channels)
+    return np.ascontiguousarray(arr)
 
 
 class Camera(Node):
@@ -13,7 +37,6 @@ class Camera(Node):
         super().__init__("color_image_calibration")
         self.subscription_colour_image = self.create_subscription(Image, '/color/image_raw', self.callback_colour, 10)
         self.subscription_depth_image = self.create_subscription(Image, '/aligned_depth_to_color/image_raw', self.callback_depth, 10)
-        self.bridge = CvBridge()
         self.bounding_box = []
         self.distance = 0
         self.position = []
@@ -24,7 +47,7 @@ class Camera(Node):
         self.start_publishing = False
         
     def callback_colour(self, data):
-        image = self.bridge.imgmsg_to_cv2(data)
+        image = imgmsg_to_cv2(data)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         imgHSV= cv2.cvtColor(image,cv2.COLOR_RGB2HSV)
@@ -73,7 +96,7 @@ class Camera(Node):
             rclpy.shutdown()   
     
     def callback_depth(self, data):
-        depth_image = self.bridge.imgmsg_to_cv2(data)
+        depth_image = imgmsg_to_cv2(data)
         try:
             self.distance = depth_image[int(self.bounding_box[1]+self.bounding_box[3]/2),
                                         int(self.bounding_box[0]+self.bounding_box[2]/2)]

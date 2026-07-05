@@ -1,0 +1,128 @@
+<?xml version="1.0"?>
+<!--
+  Fortress (Ignition Gazebo 6) plugin/material file for the CYLINDRICAL
+  tennis-ball gantry.  This is the new-Gazebo replacement for the Classic
+  `gazebo_plugin_cylindrical.xacro`.  The Classic file is left untouched.
+
+  Classic -> Fortress plugin mapping used here:
+    libgazebo_ros_joint_state_publisher.so
+        -> ignition-gazebo-joint-state-publisher-system
+           (publishes gz topic ignition.msgs.Model, bridged to ROS /joint_states)
+    libgazebo_ros_joint_pose_trajectory.so
+        -> ignition-gazebo-joint-trajectory-controller-system
+           (subscribes to a gz ignition.msgs.JointTrajectory topic, which is
+            the native equivalent of the ROS trajectory_msgs/JointTrajectory
+            that the downstream scripts already publish)
+    libgazebo_ros_control.so
+        -> NOT needed for the gantry (no ros2_control here); the trajectory
+           controller drives the joints directly.
+
+  NOTE on materials in Fortress: Classic <material>Gazebo/Black</material>
+  named scripts do not exist, so we use explicit rgba diffuse/ambient/specular.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- ===================== Materials (Fortress) ===================== -->
+  <!-- Gantry structure: black -->
+  <gazebo reference="base_link">
+    <material>
+      <ambient>0 0 0 1</ambient>
+      <diffuse>0 0 0 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+    </material>
+  </gazebo>
+
+  <gazebo reference="theta_link">
+    <material>
+      <ambient>0 0 0 1</ambient>
+      <diffuse>0 0 0 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+    </material>
+  </gazebo>
+
+  <gazebo reference="r_link">
+    <material>
+      <ambient>0 0 0 1</ambient>
+      <diffuse>0 0 0 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+    </material>
+  </gazebo>
+
+  <gazebo reference="z_link">
+    <material>
+      <ambient>0 0 0 1</ambient>
+      <diffuse>0 0 0 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+    </material>
+  </gazebo>
+
+  <!-- Tennis ball: yellow -->
+  <gazebo reference="ball">
+    <material>
+      <ambient>1 1 0 1</ambient>
+      <diffuse>1 1 0 1</diffuse>
+      <specular>0.2 0.2 0.1 1</specular>
+    </material>
+  </gazebo>
+
+  <!-- ===================== System plugins ===================== -->
+
+  <!--
+    JointStatePublisher system.
+    Publishes joint positions/velocities of the listed joints on the gz topic
+    below as an ignition.msgs.Model message.  The ros_gz_bridge maps this gz
+    topic to the ROS /joint_states (sensor_msgs/JointState) topic.
+    gz topic: /world/tennis_world/model/tennis_ball/joint_state
+  -->
+  <gazebo>
+    <plugin filename="ignition-gazebo-joint-state-publisher-system"
+            name="ignition::gazebo::systems::JointStatePublisher">
+      <topic>/world/tennis_world/model/tennis_ball/joint_state</topic>
+      <joint_name>theta_joint</joint_name>
+      <joint_name>r_joint</joint_name>
+      <joint_name>z_joint</joint_name>
+    </plugin>
+  </gazebo>
+
+  <!--
+    JointTrajectoryController system.
+    This is the Fortress replacement for libgazebo_ros_joint_pose_trajectory.so.
+    It subscribes to an ignition.msgs.JointTrajectory message on the gz topic
+    below.  The ros_gz_bridge maps ROS /set_joint_trajectory
+    (trajectory_msgs/JointTrajectory) -> this gz topic, so the EXISTING
+    downstream publishers (scripts/tennis_ball_position_publisher_*.py and
+    scripts/reset_sim_tennis_ball.py, which publish
+    trajectory_msgs/JointTrajectory on /set_joint_trajectory) keep working
+    with no message-format change.
+
+    The message's joint_names must match the joints below
+    (theta_joint, r_joint, z_joint) and positions drive them.  Per-joint
+    position PD gains are provided so the controller actually tracks the
+    commanded joint positions (order matches the internal joint order, which
+    is the order joints are discovered on the model).
+
+    gz command topic: /model/tennis_ball/set_joint_trajectory
+  -->
+  <gazebo>
+    <plugin filename="ignition-gazebo-joint-trajectory-controller-system"
+            name="ignition::gazebo::systems::JointTrajectoryController">
+      <topic>/model/tennis_ball/set_joint_trajectory</topic>
+
+      <joint_name>theta_joint</joint_name>
+      <position_p_gain>2000.0</position_p_gain>
+      <position_i_gain>0.0</position_i_gain>
+      <position_d_gain>50.0</position_d_gain>
+
+      <joint_name>r_joint</joint_name>
+      <position_p_gain>2000.0</position_p_gain>
+      <position_i_gain>0.0</position_i_gain>
+      <position_d_gain>50.0</position_d_gain>
+
+      <joint_name>z_joint</joint_name>
+      <position_p_gain>2000.0</position_p_gain>
+      <position_i_gain>0.0</position_i_gain>
+      <position_d_gain>50.0</position_d_gain>
+    </plugin>
+  </gazebo>
+
+</robot>

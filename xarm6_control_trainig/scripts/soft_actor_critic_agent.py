@@ -66,4 +66,35 @@
 #     def reset(self):
 #         self.publisher_reset.publish()
 
+import rclpy
+from rclpy.node import Node
+from std_msgs.msg import Float32MultiArray
 
+import torch
+import torch.nn as nn
+
+
+class SACAgent(Node):
+    def __init__(self):
+        super().__init__('sac_agent')
+
+        # Action publisher 
+        self.publisher_ = self.create_publisher(
+            # Replace with your joint message type
+            Float32MultiArray, 
+            'joint_pose',
+            10)
+
+        # ... SAC implementation (networks, replay buffer, training loop) ...
+
+    def process_state(self, x, y, distance):
+        # Convert into a PyTorch tensor for SAC input
+        state = torch.tensor([x, y, distance])  
+
+        # Get action from your SAC policy
+        action = self.policy_network(state)  
+
+        # Construct joint message and publish
+        joint_msg = Float32MultiArray()
+        # ... populate joint_msg based on action ...
+        self.publisher_.publish(joint_msg)  
